@@ -192,7 +192,7 @@ NeverLose.RandomString = LPH_NO_VIRTUALIZE(function()
 	return string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4));
 end);
 
-ProtectGui(GlobalWindow);
+pcall(function() ProtectGui(GlobalWindow) end);
 
 GlobalWindow.Name = NeverLose.RandomString();
 GlobalWindow.IgnoreGuiInset = true;
@@ -999,7 +999,7 @@ NeverLose.ProcessParams = LPH_NO_VIRTUALIZE(function(self , Params , Fixed)
 	return k;
 end);
 
-NeverLose.EnabledBlur = true;
+NeverLose.EnabledBlur = false; -- was true: blur Part/DoF crashes many executors
 NeverLose.BlurModuleParent = workspace.CurrentCamera;
 
 NeverLose.GetCalculatePosition = LPH_NO_VIRTUALIZE(function(planePos, planeNormal, rayOrigin, rayDirection)
@@ -3861,8 +3861,8 @@ end;
 function NeverLose:CreateWindow(Config)
 	Config = NeverLose:ProcessParams(Config , {
 		Logo = NeverLose.GlobalLogo,
-		Name = "Neverlose",
-		Content = "Counter-Strike 2",
+		Name = "Juru",
+		Content = "",
 		Size = UDim2.new(0, 640, 0, 480),
 		ConfigFolder = "NeverLoseConfigs",
 		Enable3DRenderer = false,
@@ -4336,6 +4336,7 @@ function NeverLose:CreateWindow(Config)
 	ExpireLabel.Font = Enum.Font.GothamBold
 	ExpireLabel.Text = ""
 	ExpireLabel.Visible = false
+	ExpireLabel.TextTransparency = 1
 	ExpireLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	ExpireLabel.TextSize = 10.000
 	ExpireLabel.TextTransparency = 0.650
@@ -5111,6 +5112,7 @@ function NeverLose:CreateWindow(Config)
 	end;
 
 	function Window:_InitConfig()
+		do return { Signals = {} } end -- disabled
 		local ConfigSignal = NeverLose:CreateSignal(false);
 		local ConfigLib = {
 			Signals = {},
@@ -5864,7 +5866,7 @@ function NeverLose:CreateWindow(Config)
 		return ConfigLib;
 	end;
 
-	Window:_InitConfig();
+	pcall(function() end) -- _InitConfig disabled (config menu crash)
 
 	local UserSettings = NeverLose:CreateOptionWindow(BottomFrame , BottomFrame.ZIndex + 13);
 	local reciveSignal;
@@ -5899,14 +5901,15 @@ function NeverLose:CreateWindow(Config)
 			Expires = "",
 		});
 
-		AccountName.Text = Config.Username;
-		AccountProfile.Image = Config.Profile;
-		ExpireLabel.Text = Config.Expires or "";
-		ExpireLabel.Visible = (Config.Expires ~= nil and Config.Expires ~= "");
+		AccountName.Text = Config.Username or LocalPlayer.DisplayName;
+		AccountProfile.Image = Config.Profile or "";
+		ExpireLabel.Text = "";
+		ExpireLabel.Visible = false;
+		ExpireLabel.TextTransparency = 1;
 
 		Window.Username = Config.Username or Window.Username;
 		Window.Profile = Config.Profile or Window.Profile;
-		Window.Expires = Config.Expires or Window.Expires;
+		Window.Expires = "";
 
 		if Window.UserSettings.UserFrame then
 			Window.UserSettings.UserFrame:SetUsername(Window.Username);
@@ -6341,6 +6344,12 @@ function NeverLose:CreateLogger()
 	if NeverLose.__LogSystem then
 		return 	NeverLose.__LogSystem;
 	end;
+	-- Lightweight stub (full logger UI contributed to crashes)
+	local Logging = {}
+	function Logging.new() end
+	NeverLose.__LogSystem = Logging
+	do return Logging end
+
 
 	local Logging = {};
 	local Log = Instance.new("Frame")
