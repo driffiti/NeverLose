@@ -151,8 +151,12 @@ isfile = isfile or getgenv().isfile;
 
 local NeverLose = {};
 
-NeverLose.BuiltInRegular = Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Regular,Enum.FontStyle.Normal);
-NeverLose.BuiltInBold = Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Bold,Enum.FontStyle.Normal);
+NeverLose.BuiltInRegular = Font.fromEnum(Enum.Font.Gotham)
+NeverLose.BuiltInBold = Font.fromEnum(Enum.Font.GothamBold)
+pcall(function()
+	NeverLose.BuiltInRegular = Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Regular,Enum.FontStyle.Normal);
+	NeverLose.BuiltInBold = Font.new('rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json',Enum.FontWeight.Bold,Enum.FontStyle.Normal);
+end)
 NeverLose.GlobalSignals = {};
 NeverLose.UnloadEnabled = false;
 
@@ -175,7 +179,15 @@ local FastTween = TweenInfo.new(0.05);
 local VSlowTween = TweenInfo.new(0.5,Enum.EasingStyle.Quint);
 local Encryption = {};
 
-NeverLose.UserProfile = Players:GetUserThumbnailAsync(LocalPlayer.UserId , Enum.ThumbnailType.HeadShot , Enum.ThumbnailSize.Size150x150)
+NeverLose.UserProfile = ""
+-- Thumbnail deferred / optional — GetUserThumbnailAsync hard-crashes some executors on inject
+task.defer(function()
+	if getgenv and getgenv().NL_LOAD_AVATAR then
+		pcall(function()
+			NeverLose.UserProfile = Players:GetUserThumbnailAsync(LocalPlayer.UserId , Enum.ThumbnailType.HeadShot , Enum.ThumbnailSize.Size150x150)
+		end)
+	end
+end)
 NeverLose.RandomString = LPH_NO_VIRTUALIZE(function()
 	return string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4))..string.rep(string.char(math.random(1,7)),math.random(1,4));
 end);
@@ -186,7 +198,12 @@ GlobalWindow.Name = NeverLose.RandomString();
 GlobalWindow.IgnoreGuiInset = true;
 GlobalWindow.ZIndexBehavior = Enum.ZIndexBehavior.Global;
 GlobalWindow.ResetOnSpawn = false;
-GlobalWindow.Parent = CoreGui;
+pcall(function()
+	GlobalWindow.Parent = CoreGui
+end)
+if not GlobalWindow.Parent then
+	pcall(function() GlobalWindow.Parent = LocalPlayer:WaitForChild("PlayerGui") end)
+end
 
 NeverLose.Scales = {
 	Small = UDim2.fromOffset(540,380),
@@ -206,38 +223,29 @@ NeverLose.IsMosueOverOtherFrame = false;
 NeverLose.GlobalLogo = "rbxassetid://120358385035996";
 NeverLose.ImageColorMapping = "rbxassetid://4155801252";
 
-if getcustomasset then
+-- Asset download disabled by default (HttpGet/getcustomasset caused executor crashes).
+-- Enable with getgenv().NL_LOAD_ASSETS = true before requiring this library.
+if getcustomasset and getgenv and getgenv().NL_LOAD_ASSETS then
 	local link = "https://github.com/4lpaca-pin/NeverLose/blob/main/assets/%s?raw=true";
 	local dir = 'NLAssets';
-
-	if not isfolder(dir) then
-		makefolder(dir);
-	end;
-
 	pcall(function()
+		if not isfolder(dir) then makefolder(dir) end
 		if not isfile(dir..'/'..'logo.png') then
 			local byte = game:HttpGet(string.format(link,'logo.png'));
-
 			writefile(dir..'/'..'logo.png' , byte);
-			task.wait();
-		end;
-
+		end
 		if isfile(dir..'/'..'logo.png') then
 			NeverLose.GlobalLogo = getcustomasset(dir..'/'..'logo.png')
-		end;
+		end
 	end);
-
 	pcall(function()
 		if not isfile(dir..'/'..'saturation_value_gradient.png') then
 			local byte = game:HttpGet(string.format(link,'saturation_value_gradient.png'));
-
 			writefile(dir..'/'..'saturation_value_gradient.png' , byte);
-			task.wait();
-		end;
-
+		end
 		if isfile(dir..'/'..'saturation_value_gradient.png') then
 			NeverLose.ImageColorMapping = getcustomasset(dir..'/'..'saturation_value_gradient.png')
-		end;
+		end
 	end);
 end;
 
@@ -1855,7 +1863,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			Rounding = 0,
 			Nums = {},
 			Flag = nil,
-			Size = 125,
+			Size = 100, -- >=100 = fill handler width (no label clip)
 			Callback = EmptyFunction,
 		});
 
@@ -1865,9 +1873,9 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			return (Config.Default - Config.Min) / (Config.Max - Config.Min);
 		end);
 
-		local FullNumSize = TextService:GetTextSize(string.rep("0",(Config.Rounding + #tostring(Config.Max))+1)..tostring(Config.Type),10,Enum.Font.GothamMedium,Vector2.new(math.huge,math.huge));
+		local FullNumSize = TextService:GetTextSize(string.rep("0",math.min(6, (Config.Rounding + #tostring(Config.Max))+1))..tostring(Config.Type),10,Enum.Font.GothamMedium,Vector2.new(math.huge,math.huge));
 
-		SliderLib.MaximumSize = FullNumSize.X;
+		SliderLib.MaximumSize = math.min(FullNumSize.X, 42);
 
 		if Config.Nums then
 			local nszie = 0;
@@ -1907,7 +1915,13 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		Slider.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Slider.BorderSizePixel = 0
 		Slider.ClipsDescendants = false
-		Slider.Size = UDim2.new(0, Config.Size, 0, 18)
+		-- Fill available handler width (was fixed Config.Size and overlapped long labels)
+		local useScale = (Config.Size == nil) or (Config.Size >= 100)
+		if useScale then
+			Slider.Size = UDim2.new(1, 0, 0, 18)
+		else
+			Slider.Size = UDim2.new(0, Config.Size, 0, 18)
+		end
 		Slider.ZIndex = ZINdex + 13
 		Slider.LayoutOrder = -(#Handler:GetChildren() + 5);
 
@@ -3424,15 +3438,17 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 		BasedLabel.BackgroundTransparency = 1.000
 		BasedLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		BasedLabel.BorderSizePixel = 0
-		BasedLabel.Position = UDim2.new(0, 11, 0, 6)
-		BasedLabel.Size = UDim2.new(0,1, 0, 15)
+		BasedLabel.Position = UDim2.new(0, 10, 0, 7)
+		BasedLabel.Size = UDim2.new(0.36, 0, 0, 16)
 		BasedLabel.ZIndex = LayerIndex + 9
 		BasedLabel.Font = Enum.Font.GothamMedium
 		BasedLabel.Text = Name
 		BasedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-		BasedLabel.TextSize = 13.000
-		BasedLabel.TextTransparency = 0.35
+		BasedLabel.TextSize = 12.000
+		BasedLabel.TextTransparency = 0.25
 		BasedLabel.TextXAlignment = Enum.TextXAlignment.Left
+		BasedLabel.TextTruncate = Enum.TextTruncate.AtEnd
+		BasedLabel.ClipsDescendants = true
 
 		LineFrame.Name = NeverLose.RandomString();
 		LineFrame.Parent = BasedFrame
@@ -3452,9 +3468,11 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 		BasedHandler.BackgroundTransparency = 1.000
 		BasedHandler.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		BasedHandler.BorderSizePixel = 0
-		BasedHandler.Position = UDim2.new(1, -11, 0, 2)
-		BasedHandler.Size = UDim2.new(1, -20, 0, 25)
+		-- Right side for controls on the SAME row as the name
+		BasedHandler.Position = UDim2.new(1, -8, 0, 5)
+		BasedHandler.Size = UDim2.new(0.60, -12, 0, 20)
 		BasedHandler.ZIndex = LayerIndex + 12
+		BasedHandler.ClipsDescendants = true
 
 		UIListLayout.Parent = BasedHandler
 		UIListLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -3773,7 +3791,8 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 		UserStatusLabel.Size = UDim2.new(1, -35, 0, 15)
 		UserStatusLabel.ZIndex = LayerIndex + 9
 		UserStatusLabel.Font = Enum.Font.GothamMedium
-		UserStatusLabel.Text = Expires or 'Never'
+		UserStatusLabel.Text = Expires or ''
+		UserStatusLabel.Visible = (Expires ~= nil and Expires ~= '')
 		UserStatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 		UserStatusLabel.TextSize = 13.000
 		UserStatusLabel.TextTransparency = 0.200
@@ -3829,7 +3848,8 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 		end;
 
 		function UserFrameItem:SetExpires(Exp)
-			UserStatusLabel.Text = Exp or 'Never';
+			UserStatusLabel.Text = Exp or ''
+			UserStatusLabel.Visible = (Exp ~= nil and Exp ~= '');
 		end;
 
 		return UserFrameItem;
@@ -3862,12 +3882,18 @@ function NeverLose:CreateWindow(Config)
 		Enable3DRenderer = Config.Enable3DRenderer
 	};
 
-	NeverLose.GlobalLogo = Window.Logo;
+	-- Do not force GlobalLogo swap (can crash some executors)
+	pcall(function()
+		if Window.Logo then NeverLose.GlobalLogo = Window.Logo end
+	end);
 
-	local Logging = NeverLose:CreateLogger();
-	if not isfolder(Window.ConfigFolder) then
-		makefolder(Window.ConfigFolder);
-	end;
+	local Logging = nil
+	pcall(function() Logging = NeverLose:CreateLogger() end);
+	pcall(function()
+		if Window.ConfigFolder and typeof(isfolder) == "function" and not isfolder(Window.ConfigFolder) then
+			if typeof(makefolder) == "function" then makefolder(Window.ConfigFolder) end
+		end
+	end);
 
 	local WindowFrame = Instance.new("Frame")
 	local UICorner = Instance.new("UICorner")
@@ -4308,7 +4334,8 @@ function NeverLose:CreateWindow(Config)
 	ExpireLabel.Size = UDim2.new(0, 200, 0, 15)
 	ExpireLabel.ZIndex = 7
 	ExpireLabel.Font = Enum.Font.GothamBold
-	ExpireLabel.Text = "never"
+	ExpireLabel.Text = ""
+	ExpireLabel.Visible = false
 	ExpireLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	ExpireLabel.TextSize = 10.000
 	ExpireLabel.TextTransparency = 0.650
@@ -5869,12 +5896,13 @@ function NeverLose:CreateWindow(Config)
 		Config = NeverLose:ProcessParams(Config , {
 			Profile = NeverLose.UserProfile,
 			Username = LocalPlayer.DisplayName,
-			Expires = "Never",
+			Expires = "",
 		});
 
 		AccountName.Text = Config.Username;
 		AccountProfile.Image = Config.Profile;
-		ExpireLabel.Text = Config.Expires;
+		ExpireLabel.Text = Config.Expires or "";
+		ExpireLabel.Visible = (Config.Expires ~= nil and Config.Expires ~= "");
 
 		Window.Username = Config.Username or Window.Username;
 		Window.Profile = Config.Profile or Window.Profile;
